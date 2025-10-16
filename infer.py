@@ -21,7 +21,7 @@ model_path = ".\\best_pre_correction_models\\best_model_20251016_121348_loss0.37
 model_path_1 = "best_pre_correction_model.pth"
 if os.path.exists(model_path):
     model.load_state_dict(torch.load(model_path))
-    model.eval()  # 切换到评估模式
+    model.eval()  # 切换到评估模式l
     print(f"成功加载模型: {model_path}")
 else:
     print(f"错误: 模型文件 {model_path} 不存在")
