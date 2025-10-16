@@ -109,6 +109,14 @@ class AberrationLoss(nn.Module):
         Returns:
             total_loss: 公式11的总损失值
         """
+        # 调整维度顺序，确保输入为4维张量
+        if pred.dim()!=4:
+            pred=pred.unsqueeze(0)
+        if target.dim()!=4:
+            target=target.unsqueeze(0)
+
+
+
         # 步骤1：计算SSIM损失（论文公式13）：1-SSIM（SSIM越接近1，损失越小）
         loss_ssim = 1 - ssim(
             pred, target,
