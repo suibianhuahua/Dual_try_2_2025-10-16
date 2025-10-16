@@ -1,9 +1,6 @@
 '''
 本代码的作用是利用训练好的模型去验证效果
 '''
-
-
-
 import torch
 import torch.nn as nn
 from PIL import Image
@@ -20,7 +17,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = AberrationCNN().to(device)
 
 # 3. 加载训练好的模型参数
-model_path = "pre_correction_model.pth"  # 或 "best_pre_correction_model.pth"
+model_path = ".\\best_pre_correction_models\\best_model_20251016_121348_loss0.3720.pth"  # 或 "best_pre_correction_model.pth"
+model_path_1 = "best_pre_correction_model.pth"
 if os.path.exists(model_path):
     model.load_state_dict(torch.load(model_path))
     model.eval()  # 切换到评估模式
@@ -30,7 +28,7 @@ else:
     exit()
 
 # 4. 准备输入数据（示例：加载测试图像）
-test_img_path = "F:\\BaiduNetdiskDownload\\COCO_2014\\train2014\\COCO_train2014_000000000036.jpg"
+test_img_path = "F:\\BaiduNetdiskDownload\\COCO_2014\\train2014\\COCO_train2014_000000000078.jpg"
 if os.path.exists(test_img_path):
     test_img = Image.open(test_img_path).convert("RGB").resize((104, 104))
     test_array = np.array(test_img).astype(np.float32) / 255.0
@@ -58,11 +56,18 @@ plt.show()
 
 # 7. （可选）应用 PSF 模拟成像并计算损失
 lambda_values = np.array([486, 587, 656]) * 1e-9
+# aberration_coeffs = np.array([
+#     [0.4548, -0.0218, 0.7161, 0.3540],
+#     [0.4202, -0.0302, 0.5895, 0.2921],
+#     [0.3905, -0.0304, 0.5264, 0.2611]
+# ])
 aberration_coeffs = np.array([
-    [0.4548, -0.0218, 0.7161, 0.3540],
-    [0.4202, -0.0302, 0.5895, 0.2921],
-    [0.3905, -0.0304, 0.5264, 0.2611]
+    [0.4548, -0.0365, 2.0154, 0.9962],  # 蓝光
+    [0.4202, -0.0506, 1.6590, 0.8220],  # 绿光
+    [0.3905, -0.0509, 1.4816, 0.7348]  # 红光
 ])
+
+
 PSF = torch.from_numpy(compute_psf(lambda_values, aberration_coeffs, visualize=False)).float().to(device)
 simulated_test = torch_apply_psf(PSF, pre_corrected_test)
 # 修正维度不匹配
