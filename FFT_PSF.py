@@ -261,7 +261,9 @@ def torch_apply_psf(psf, image):
     Y_sim = torch.clamp(Y_sim, 0, float('inf'))
     min_val = Y_sim.view(B, C, -1).min(dim=2)[0].unsqueeze(2).unsqueeze(3)
     max_val = Y_sim.view(B, C, -1).max(dim=2)[0].unsqueeze(2).unsqueeze(3)
+    # 计算一个掩码，避免除以零
     mask = max_val > min_val
+    # 若满足最大值大于最小值，则进行归一化；否则保持原值（即该位置为最小值，避免除0错误）
     Y_sim = torch.where(mask, (Y_sim - min_val) / (max_val - min_val + 1e-8), Y_sim)
 
     return Y_sim.squeeze(0) if B == 1 else Y_sim

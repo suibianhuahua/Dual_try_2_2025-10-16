@@ -41,7 +41,7 @@ def main():
     # ])
 
     # 3. 计算 PSF
-    PSF = compute_psf(lambda_values, aberration_coeffs, visualize=False)
+    PSF = compute_psf(lambda_values, aberration_coeffs,g=8.48e-3, visualize=False)
 
     # 4. 加载训练/验证图片路径
     train_dir = "F:\\BaiduNetdiskDownload\\COCO_2014\\train2014\\"
