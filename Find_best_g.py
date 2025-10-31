@@ -23,8 +23,9 @@ test_image_path="E:\\桌面\\微信图片_20251019131600_122_386.png"
 test_img = Image.open(test_image_path).convert("RGB")
 test_array = np.array(test_img) / 255.0  # 归一化到 [0, 1]
 test_tensor = torch.from_numpy(test_array.transpose(2, 0, 1)).float().unsqueeze(0)
+list_g=[]
 
-for i in np.arange(1e-3,30e-3,1e-3):
+for i in np.arange(1e-3,30e-3,1e-4):
     g=i
     PSF= compute_psf(lambda_values, aberration_coeffs1,g=g,visualize=False)
 
@@ -37,5 +38,6 @@ for i in np.arange(1e-3,30e-3,1e-3):
 
     criterion = AberrationLoss()
     loss = criterion(simulated_test, test_tensor)
+    list_g.append([g,loss.item()])
     print(f"g={g:.4f} m时，LOSS={loss.item():.4f}")
 

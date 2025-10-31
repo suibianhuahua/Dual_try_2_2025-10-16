@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import datetime
-
+from Extract_PSF import *
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -41,8 +41,9 @@ def main():
     # ])
 
     # 3. 计算 PSF
-    PSF = compute_psf(lambda_values, aberration_coeffs,g=8.48e-3, visualize=False)
-
+    # PSF = compute_psf(lambda_values, aberration_coeffs,g=8.48e-3, visualize=False)
+    PSF=extract_psf(file_path="PSF.txt",visual=False)
+    
     # 4. 加载训练/验证图片路径
     train_dir = "F:\\BaiduNetdiskDownload\\COCO_2014\\train2014\\"
     val_dir = "F:\\BaiduNetdiskDownload\\COCO_2014\\val2014\\"
@@ -58,10 +59,10 @@ def main():
 
     # 5. 创建数据集
     train_clean_images, _ = create_training_dataset(PSF, image_paths=train_image_paths,
-                                                    synthetic_count=100 if not train_image_paths else 0, image_size=104,
-                                                    device=device, max_images=1000)
+                                                    synthetic_count=100 if not train_image_paths else 0, image_size=PaperParams.EI_SIZE[0],
+                                                    device=device, max_images=5000)
     val_clean_images, _ = create_training_dataset(PSF, image_paths=val_image_paths,
-                                                  synthetic_count=50 if not val_image_paths else 0, image_size=104,
+                                                  synthetic_count=50 if not val_image_paths else 0, image_size=PaperParams.EI_SIZE[1],
                                                   device=device, max_images=200)
 
     # 6. 定义 Dataset 和 DataLoader
@@ -165,10 +166,10 @@ def main():
         test_img_path = "F:\\BaiduNetdiskDownload\\COCO_2014\\train2014\\COCO_train2014_000000000025.jpg" if os.path.exists(
             "F:\\BaiduNetdiskDownload\\COCO_2014\\train2014\\COCO_train2014_000000000025.jpg") else None
         if test_img_path:
-            test_img = Image.open(test_img_path).convert("RGB").resize((104, 104))
+            test_img = Image.open(test_img_path).convert("RGB").resize((PaperParams.EI_SIZE[0],PaperParams.EI_SIZE[1]))
             test_array = np.array(test_img).astype(np.float32) / 255.0
         else:
-            test_array = create_synthetic_image(size=104)
+            test_array = create_synthetic_image(size=PaperParams.EI_SIZE[1])
 
         test_tensor = torch.from_numpy(test_array.transpose(2, 0, 1)).float().unsqueeze(0).to(device)
         pre_corrected_test = model(test_tensor)[0]
