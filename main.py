@@ -82,7 +82,7 @@ def main():
 
     # 7. 初始化模型、损失函数、优化器
     model = AberrationCNN().to(device)
-    criterion = AberrationLoss().to(device)
+    criterion = AberrationLossV2(omega=0.7,bright_weight=2.0).to(device)
     optimizer = optim.SGD(model.parameters(), lr=PaperParams.LR, momentum=0.9)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.8, patience=3)
 
@@ -98,11 +98,13 @@ def main():
             clean_batch = clean_batch.to(device)
             optimizer.zero_grad()
             pre_corrected = model(clean_batch)
+            pre_corrected = torch.clamp(pre_corrected, 0.0, 1.0)
             simulated = torch.zeros_like(pre_corrected)
             for i in range(pre_corrected.size(0)):
                 simulated[i] = torch_apply_psf(PSF, pre_corrected[i])
-            loss = criterion(simulated, clean_batch)
+            loss = criterion(simulated, clean_batch,pre_corrected)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             running_loss += loss.item()
 

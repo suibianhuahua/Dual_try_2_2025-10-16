@@ -132,21 +132,21 @@ class AberrationLoss(nn.Module):
 
         return total_loss
 
+# ---------- 1. 损失函数 ----------
 class AberrationLossV2(nn.Module):
-    def __init__(self, omega=0.8, brightness_weight=1.0):
+    def __init__(self, omega=0.7, bright_weight=2.0):
         super().__init__()
         self.omega = omega
-        self.bw = brightness_weight
-        self.mse = nn.MSELoss()
-        self.ssim_mod = ssim
+        self.bw   = bright_weight
+        self.mse  = nn.MSELoss()
 
-    def forward(self, pred_recon, target, pre_corrected):
-        # 1. 主损失
-        loss_ssim = 1 - self.ssim_mod(pred_recon, target, data_range=1.0)
-        loss_mse = self.mse(pred_recon, target)
+    def forward(self, pred_recon, target, pre_corrected=None):
+        # 主损失（公式 11）
+        loss_ssim = 1 - ssim(pred_recon, target, data_range=1.0)
+        loss_mse  = self.mse(pred_recon, target)
         loss_main = self.omega * loss_ssim + (1 - self.omega) * loss_mse
 
-        # 2. 亮度匹配：重建图与目标图均值相等
-        brightness_loss = torch.abs(pred_recon.mean() - target.mean())
+        # 亮度匹配正则（只依赖重建图和目标图）
+        loss_bright = torch.abs(pred_recon.mean() - target.mean())
 
-        return loss_main + self.bw * brightness_loss
+        return loss_main + self.bw * loss_bright
