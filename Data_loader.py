@@ -135,7 +135,7 @@ def batch_generator(clean_images, aberrated_images, batch_size=16, shuffle=True)
 
 
 
-def create_training_dataset(PSF, image_paths=None, synthetic_count=0, image_size=256, device='cpu', max_images=1000):
+def create_training_dataset(PSF, image_paths=None, synthetic_count=0, image_size=256, device='cpu', max_images=1000,convolution=False):
     """
     创建训练数据集
 
@@ -171,7 +171,7 @@ def create_training_dataset(PSF, image_paths=None, synthetic_count=0, image_size
 
                     # 应用PSF卷积
                     clean_tensor, aberrated_tensor = FFT_PSF_for_training(
-                        PSF, img_array, return_torch=True, device=device
+                        PSF, img_array, return_torch=True, device=device,convolution=False
                     )
 
                     clean_images.append(clean_tensor)
@@ -187,9 +187,15 @@ def create_training_dataset(PSF, image_paths=None, synthetic_count=0, image_size
     for i in range(min(remaining_count, synthetic_count)):
         synthetic_img = create_synthetic_image(image_size)
         clean_tensor, aberrated_tensor = FFT_PSF_for_training(
-            PSF, synthetic_img, return_torch=True, device=device
+            PSF, synthetic_img, return_torch=True, device=device,convolution=False
         )
         clean_images.append(clean_tensor)
         aberrated_images.append(aberrated_tensor)
+    
+     # 校验数据格式
+    for i, (clean, aberrated) in enumerate(zip(clean_images, aberrated_images)):
+        if not isinstance(clean, torch.Tensor) or not isinstance(aberrated, torch.Tensor):
+            raise TypeError(f"第{i}个样本不是张量，类型：{type(clean)}, {type(aberrated)}")
+
 
     return clean_images, aberrated_images

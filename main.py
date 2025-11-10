@@ -19,7 +19,7 @@ def main():
 
     # -------------------------- 1. 新增：创建最佳模型专属保存文件夹 --------------------------
     # 定义文件夹路径（可自定义，如"best_models"）
-    best_model_dir = "best_pre_correction_models"
+    best_model_dir = "best_pre_correction_models_try"
     # 若文件夹不存在则创建，exist_ok=True避免重复创建报错
     os.makedirs(best_model_dir, exist_ok=True)
     # 用于记录已保存的最佳模型信息：列表元素为 (损失值, 模型文件路径)
@@ -60,12 +60,12 @@ def main():
     # 5. 创建数据集
     # 此处所得到的train_clean_images和val_clean_images都是“干净图像”的Pytorch向量列表
     # 列表中的每个元素是“单张干净图像”的向量(torch.Tensor)，维度为(C,H,W)，数值范围归一化到[0,1]
-    train_clean_images, _ = create_training_dataset(PSF, image_paths=train_image_paths,
-                                                    synthetic_count=100 if not train_image_paths else 0, image_size=PaperParams.EI_SIZE[0],
-                                                    device=device, max_images=5000)
-    val_clean_images, _ = create_training_dataset(PSF, image_paths=val_image_paths,
+    train_clean_images,_ = create_training_dataset(PSF, image_paths=train_image_paths,
+                                                    synthetic_count=100 if not train_image_paths else 0, image_size=PaperParams.EI_SIZE[0], device=device, max_images=3000,convolution=False)
+    val_clean_images,_ = create_training_dataset(PSF, image_paths=val_image_paths,
                                                   synthetic_count=50 if not val_image_paths else 0, image_size=PaperParams.EI_SIZE[1],
-                                                  device=device, max_images=200)
+                                                  device=device, max_images=200,convolution=False)
+    print("数据集创建完毕！")
 
     # 6. 定义 Dataset 和 DataLoader
     class PreCorrectionDataset(Dataset):

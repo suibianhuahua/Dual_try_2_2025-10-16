@@ -113,7 +113,7 @@ def compute_psf(lambda_values, aberration_coefficients,
 
     return PSF_normalized
 
-def FFT_PSF_for_training(PSF, image_array, return_torch=True, device='cpu'):
+def FFT_PSF_for_training(PSF, image_array, return_torch=True, device='cpu',convolution=False):
     """
     对图像应用PSF卷积，专门用于神经网络训练
     返回torch tensor格式，维度为(C,H,W)
@@ -130,6 +130,7 @@ def FFT_PSF_for_training(PSF, image_array, return_torch=True, device='cpu'):
         否则:
             返回 (原始图像array, 卷积后图像array)，范围 [0, 1]
     """
+    Y_sim=None
     # 确保输入是float32格式，范围[0,1]
     if image_array.dtype != np.float32:
         image_array = image_array.astype(np.float32)
@@ -145,29 +146,37 @@ def FFT_PSF_for_training(PSF, image_array, return_torch=True, device='cpu'):
         # RGBA：去除alpha通道
         image_array = image_array[..., :3]
     # 对每个通道进行卷积
-    if image_array.ndim == 3:
-        Y_sim = np.zeros_like(image_array)
-        for c in range(image_array.shape[2]):
-            Y_sim[..., c] = fftconvolve(image_array[..., c], PSF, mode="same")
-    else:
-        Y_sim = fftconvolve(image_array, PSF, mode="same")
-        if Y_sim.ndim == 2:
-            Y_sim = Y_sim[..., np.newaxis]
+    # 如果需要进行卷积时
+    if convolution:
+        if image_array.ndim == 3:
+            Y_sim = np.zeros_like(image_array)
+            for c in range(image_array.shape[2]):
+                Y_sim[..., c] = fftconvolve(image_array[..., c], PSF, mode="same")
+        else:
+            Y_sim = fftconvolve(image_array, PSF, mode="same")
+            if Y_sim.ndim == 2:
+                Y_sim = Y_sim[..., np.newaxis]
 
-    # 归一化到 [0,1]
-    Y_sim = np.clip(Y_sim, 0, None)  # 确保非负
-    Y_sim_max = Y_sim.max()
-    Y_sim_min = Y_sim.min()
-    if Y_sim_max > Y_sim_min:
-        Y_sim = (Y_sim - Y_sim_min) / (Y_sim_max - Y_sim_min)
+            # 归一化到 [0,1]
+            Y_sim = np.clip(Y_sim, 0, None)  # 确保非负
+            Y_sim_max = Y_sim.max()
+            Y_sim_min = Y_sim.min()
+            if Y_sim_max > Y_sim_min:
+                Y_sim = (Y_sim - Y_sim_min) / (Y_sim_max - Y_sim_min)
 
     if return_torch:
         # 转换为torch tensor，并调整维度顺序 (H, W, C) -> (C, H, W)
         clean_tensor = torch.from_numpy(image_array.transpose(2, 0, 1)).float().to(device)
-        aberrated_tensor = torch.from_numpy(Y_sim.transpose(2, 0, 1)).float().to(device)
-        return clean_tensor, aberrated_tensor
+        if convolution:
+            aberrated_tensor = torch.from_numpy(Y_sim.transpose(2, 0, 1)).float().to(device)
+            return clean_tensor, aberrated_tensor
+        else:
+            return clean_tensor,clean_tensor
     else:
-        return image_array, Y_sim
+        if convolution:
+            return image_array, Y_sim
+        else:
+            return image_array, image_array
 
 
 def FFT_PSF(PSF,Pic_path):
