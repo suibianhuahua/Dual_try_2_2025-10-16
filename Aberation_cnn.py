@@ -132,91 +132,21 @@ class AberrationLoss(nn.Module):
 
         return total_loss
 
+class AberrationLossV2(nn.Module):
+    def __init__(self, omega=0.8, brightness_weight=1.0):
+        super().__init__()
+        self.omega = omega
+        self.bw = brightness_weight
+        self.mse = nn.MSELoss()
+        self.ssim_mod = ssim
 
-def correct_single_microlens(initial_ei, original_ei, feature_extractor,
-                             threshold=1e-4, patience=10, device='cuda'):
-    """
-    单微透镜像差校正（论文2.2节第一步）
-    基于特征图像损失优化初始EI，得到初步预校正EI
+    def forward(self, pred_recon, target, pre_corrected):
+        # 1. 主损失
+        loss_ssim = 1 - self.ssim_mod(pred_recon, target, data_range=1.0)
+        loss_mse = self.mse(pred_recon, target)
+        loss_main = self.omega * loss_ssim + (1 - self.omega) * loss_mse
 
-    Args:
-        initial_ei: 初始未校正EI，形状[B, C, H, W]，需设置requires_grad=True
-        original_ei: 原始无像差EI，形状[B, C, H, W]
-        feature_extractor: 用于特征提取的轻量化CNN（AberrationCNN实例）
-        threshold: 收敛判断的误差阈值
-        patience: 连续多少轮损失无改善则停止迭代
-        device: 计算设备（cuda/cpu）
+        # 2. 亮度匹配：重建图与目标图均值相等
+        brightness_loss = torch.abs(pred_recon.mean() - target.mean())
 
-    Returns:
-        preliminary_ei: 初步预校正EI（张量）
-        loss_history: 损失函数变化历史
-    """
-    # 1. 准备工作：设备转移与参数冻结
-    initial_ei = initial_ei.to(device)
-    original_ei = original_ei.to(device)
-    feature_extractor = feature_extractor.to(device)
-
-    # 2. 优化器配置（SGD更新初始EI的像素值）
-    optimizer = optim.SGD([initial_ei], lr=PaperParams.LR, momentum=0.9)  # 加入动量加速收敛
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.8, patience=3)  # 学习率自适应
-
-    # 3. 损失函数（第一损失函数：基于特征图的强度分布误差）
-    loss_func = AberrationLoss().to(device)
-
-    # 4. 迭代优化过程
-    loss_history = []
-    best_loss = float('inf') # 初始化最佳损失值为无穷大，因此第一次迭代计算出损失值后必定会进行一次更新
-    early_stop_counter = 0  #确保只有当patience轮迭代都没有损失显著下降时，才会触发早停（停止迭代），避免因短期波动而过早终止优化
-
-    for epoch in range(PaperParams.EPOCHS):
-        # 开启训练模式（保证BN层正常工作）
-        feature_extractor.train()
-
-        # 特征提取：原始EI与当前EI的结构特征图
-        with torch.no_grad():  # 原始EI特征不参与梯度计算
-            original_feat = feature_extractor.get_features(original_ei)  # 原始无像差特征
-
-        current_feat = feature_extractor.get_features(initial_ei)  # 当前EI的特征（需梯度）
-
-        # 计算特征图损失（公式11）
-        loss = loss_func(current_feat, original_feat)
-
-        # 反向传播与参数更新（仅更新initial_ei的像素值）
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()  # 直接更新EI的像素值
-
-        # 记录与监控
-        loss_val = loss.item()
-        loss_history.append(loss_val)
-
-        # 收敛判断与实时进度输出
-        # 每个epoch都输出训练进度（实时监控）
-        print(f"Epoch [{epoch + 1}/{PaperParams.EPOCHS}] | "
-              f"Current Loss: {loss_val:.6f} | "
-              f"Best Loss: {best_loss:.6f} | "
-              f"Early Stop Counter: {early_stop_counter}/{patience} | "
-              f"LR: {optimizer.param_groups[0]['lr']:.8f}",
-              end='\r')  # 回车覆盖当前行，保持输出在同一行
-
-        # 判断损失是否显著下降
-        if loss_val < best_loss - 1e-6:  # 损失显著下降
-            best_loss = loss_val
-            early_stop_counter = 0
-            preliminary_ei = initial_ei.detach().clone()  # 保存当前最佳结果
-        else:
-            early_stop_counter += 1
-
-        # 换行分隔不同阶段（每10个epoch或收敛时）
-        if (epoch + 1) % 10 == 0 or (best_loss < threshold and early_stop_counter >= patience):
-            print()  # 换行，避免被下一行覆盖
-
-        # 学习率调整（放在收敛判断后，确保基于当前损失更新学习率）
-        scheduler.step(loss_val)
-
-        # 满足收敛条件则停止
-        if best_loss < threshold or early_stop_counter >= patience:
-            print(f"Converged at epoch {epoch + 1}, Best Loss: {best_loss:.6f}")
-            break
-
-    return preliminary_ei, loss_history
+        return loss_main + self.bw * brightness_loss

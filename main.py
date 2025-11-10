@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from FFT_PSF import compute_psf, FFT_PSF_for_training, torch_apply_psf
-from Aberation_cnn import AberrationCNN, AberrationLoss, PaperParams
+from Aberation_cnn import AberrationCNN, AberrationLoss, PaperParams,AberrationLossV2
 from Data_loader import create_synthetic_image, create_training_dataset
 from PIL import Image
 import numpy as np
@@ -58,6 +58,8 @@ def main():
         val_image_paths = []
 
     # 5. 创建数据集
+    # 此处所得到的train_clean_images和val_clean_images都是“干净图像”的Pytorch向量列表
+    # 列表中的每个元素是“单张干净图像”的向量(torch.Tensor)，维度为(C,H,W)，数值范围归一化到[0,1]
     train_clean_images, _ = create_training_dataset(PSF, image_paths=train_image_paths,
                                                     synthetic_count=100 if not train_image_paths else 0, image_size=PaperParams.EI_SIZE[0],
                                                     device=device, max_images=5000)
@@ -74,6 +76,7 @@ def main():
         def __getitem__(self, idx):
             return self.clean_images[idx]
 
+    # 将干净图像张量封装到PreCorrectionDataset中，通过DataLoader按批次输入模型，作为训练/验证的“标签”，用于计算模型预校正效果的损失
     train_loader = DataLoader(PreCorrectionDataset(train_clean_images), batch_size=PaperParams.BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(PreCorrectionDataset(val_clean_images), batch_size=PaperParams.BATCH_SIZE, shuffle=False)
 
