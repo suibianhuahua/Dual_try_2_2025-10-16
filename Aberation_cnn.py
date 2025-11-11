@@ -150,3 +150,50 @@ class AberrationLossV2(nn.Module):
         loss_bright = torch.abs(pred_recon.mean() - target.mean())
 
         return loss_main + self.bw * loss_bright
+    
+class AberrationLossV3(nn.Module):
+    def __init__(self, 
+                 ssim_weight=0.5,      # 降低 SSIM 权重
+                 mse_weight=0.3,       # 提升 MSE 权重
+                 color_weight=1.0,     # 新增：颜色一致性
+                 bright_weight=1.5):   # 亮度匹配
+        super().__init__()
+        self.sw = ssim_weight
+        self.mw = mse_weight
+        self.cw = color_weight
+        self.bw = bright_weight
+
+    def forward(self, pred_recon, target, pre_corrected=None):
+        """
+        pred_recon:  模拟重建图像  [B,3,H,W]
+        target:      原始 clean EI  [B,3,H,W]
+        """
+        # 1. SSIM（结构）
+        loss_ssim = 1 - ssim(pred_recon, target, data_range=1.0)
+
+        # 2. MSE（像素级）
+        loss_mse = F.mse_loss(pred_recon, target)
+
+        # 3. 颜色一致性（通道直方图匹配）
+        def channel_hist_loss(x, y):
+            loss = 0.0
+            for c in range(3):
+                hist_x = torch.histc(x[:, c], bins=50, min=0, max=1)
+                hist_y = torch.histc(y[:, c], bins=50, min=0, max=1)
+                hist_x = hist_x / (hist_x.sum() + 1e-8)
+                hist_y = hist_y / (hist_y.sum() + 1e-8)
+                loss += F.l1_loss(hist_x, hist_y)
+            return loss / 3
+        loss_color = channel_hist_loss(pred_recon, target)
+
+        # 4. 亮度匹配
+        loss_bright = torch.abs(pred_recon.mean() - target.mean())
+
+        # 5. 总损失
+        total = (self.sw * loss_ssim +
+                 self.mw * loss_mse +
+                 self.cw * loss_color +
+                 self.bw * loss_bright)
+
+        return total
+

@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 from FFT_PSF import compute_psf, FFT_PSF_for_training, torch_apply_psf
-from Aberation_cnn import AberrationCNN, AberrationLoss, PaperParams,AberrationLossV2
+from Aberation_cnn import *
 from Data_loader import create_synthetic_image, create_training_dataset
 from PIL import Image
 import numpy as np
@@ -61,7 +61,7 @@ def main():
     # 此处所得到的train_clean_images和val_clean_images都是“干净图像”的Pytorch向量列表
     # 列表中的每个元素是“单张干净图像”的向量(torch.Tensor)，维度为(C,H,W)，数值范围归一化到[0,1]
     train_clean_images,_ = create_training_dataset(PSF, image_paths=train_image_paths,
-                                                    synthetic_count=100 if not train_image_paths else 0, image_size=PaperParams.EI_SIZE[0], device=device, max_images=3000,convolution=False)
+                                                    synthetic_count=100 if not train_image_paths else 0, image_size=PaperParams.EI_SIZE[0], device=device, max_images=5000,convolution=False)
     val_clean_images,_ = create_training_dataset(PSF, image_paths=val_image_paths,
                                                   synthetic_count=50 if not val_image_paths else 0, image_size=PaperParams.EI_SIZE[1],
                                                   device=device, max_images=200,convolution=False)
@@ -82,9 +82,20 @@ def main():
 
     # 7. 初始化模型、损失函数、优化器
     model = AberrationCNN().to(device)
-    criterion = AberrationLossV2(omega=0.7,bright_weight=2.0).to(device)
-    optimizer = optim.SGD(model.parameters(), lr=PaperParams.LR, momentum=0.9)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.8, patience=3)
+    # criterion = AberrationLossV2(omega=0.7,bright_weight=2.0).to(device)
+    # 1. 损失函数
+    criterion = AberrationLossV3(
+        ssim_weight=0.4,   # 降低结构权重
+        mse_weight=0.3,
+        color_weight=1.5,  # 重点提升颜色
+        bright_weight=1.0
+    ).to(device)
+    # optimizer = optim.SGD(model.parameters(), lr=PaperParams.LR, momentum=0.9)
+    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', factor=0.8, patience=3)
+    optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
+        optimizer, T_0=50, T_mult=2
+    )
 
     # 8. 训练循环（核心：最佳模型保存与筛选）
     epochs = PaperParams.EPOCHS
