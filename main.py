@@ -19,12 +19,12 @@ def main():
 
     # -------------------------- 1. 新增：创建最佳模型专属保存文件夹 --------------------------
     # 定义文件夹路径（可自定义，如"best_models"）
-    best_model_dir = "best_pre_correction_models_try"
+    best_model_dir = "best_pre_correction_models_new_model"
     # 若文件夹不存在则创建，exist_ok=True避免重复创建报错
     os.makedirs(best_model_dir, exist_ok=True)
     # 用于记录已保存的最佳模型信息：列表元素为 (损失值, 模型文件路径)
     saved_best_models = []
-    # 设定保留的最大模型数量
+    # 设定保留的最大模型数量 
     max_keep_models = 10
 
     # 2. 定义波长和像差系数
@@ -81,7 +81,8 @@ def main():
     val_loader = DataLoader(PreCorrectionDataset(val_clean_images), batch_size=PaperParams.BATCH_SIZE, shuffle=False)
 
     # 7. 初始化模型、损失函数、优化器
-    model = AberrationCNN().to(device)
+    # model = AberrationCNN().to(device)
+    model=AberrationCNN_v3().to(device)
     # criterion = AberrationLossV2(omega=0.7,bright_weight=2.0).to(device)
     # 1. 损失函数
     criterion = AberrationLossV3(
@@ -250,7 +251,11 @@ def test():
     if K.dim() == 3:
         K_1 = K.unsqueeze(0)
 
-    criterion = AberrationLoss().to(device)
+    # criterion = AberrationLossV3().to(device)
+    criterion = AberrationLossV3(
+    ssim_weight=0.4, mse_weight=0.3,
+    color_weight=1.5, bright_weight=1.0
+    ).to(device)
     loss = criterion(simulated_pre, ini_tensor)
     loss1 = criterion(K_1, ini_tensor)
 
